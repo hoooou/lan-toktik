@@ -784,6 +784,13 @@
             v.playbackRate = 1;
           }
         });
+        // 懒加载：仅当前与相邻视频预载元数据，其余保持未加载，避免大量视频同时请求卡死
+        slides.forEach((s, i) => {
+          const v = s.querySelector("video, audio");
+          if (!v) return;
+          v.preload =
+            i === idx || i === idx - 1 || i === idx + 1 ? "metadata" : "none";
+        });
         syncBar();
         updateRotateBtn();
         const cv = slide(idx)?.querySelector("video, audio");
@@ -930,7 +937,7 @@
           video.loop = true;
           video.muted = isMuted;
           video.playsInline = true;
-          video.preload = "metadata";
+          video.preload = "none";
           video.setAttribute("playsinline", "");
           video.setAttribute("webkit-playsinline", "");
           const src = document.createElement("source");
@@ -955,7 +962,7 @@
           const audio = document.createElement("audio");
           audio.loop = true;
           audio.muted = isMuted;
-          audio.preload = "metadata";
+          audio.preload = "none";
           const src = document.createElement("source");
           src.src = item.url;
           src.type = item.mime || "audio/mpeg";
