@@ -31,6 +31,7 @@
           -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         user-select: none;
         -webkit-user-select: none;
+        -webkit-touch-callout: none;
       }
 
       .app {
@@ -1486,6 +1487,9 @@
         }, 1000);
 
         updateRotateBtn();
+
+        // 拦截原生长按/右键菜单（与 2 倍速长按手势冲突）
+        document.addEventListener("contextmenu", (e) => e.preventDefault());
       }
 
       window.onload = boot;
