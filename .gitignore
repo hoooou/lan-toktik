@@ -21,3 +21,6 @@ Thumbs.db
 # Media
 media/*
 !media/.gitkeep
+
+# Trash
+.trash/

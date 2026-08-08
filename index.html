@@ -172,7 +172,7 @@
       .info-panel {
         position: absolute;
         left: 16px;
-        bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+        bottom: calc(104px + env(safe-area-inset-bottom, 0px));
         width: calc(100% - 88px);
         max-width: 520px;
         z-index: 20;
@@ -180,7 +180,7 @@
       @media (min-width: 768px) {
         .info-panel {
           left: 40px;
-          bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+          bottom: calc(112px + env(safe-area-inset-bottom, 0px));
         }
       }
       .info-panel {
@@ -202,7 +202,7 @@
       .sidebar {
         position: absolute;
         right: 12px;
-        bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+        bottom: calc(128px + env(safe-area-inset-bottom, 0px));
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -213,7 +213,7 @@
       @media (min-width: 768px) {
         .sidebar {
           right: 40px;
-          bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+          bottom: calc(144px + env(safe-area-inset-bottom, 0px));
         }
       }
 
@@ -269,13 +269,6 @@
       .sidebar-action.favd .sidebar-icon svg {
         fill: #ffb900;
       }
-      .sidebar-action.disliked .sidebar-icon {
-        background: rgba(254, 44, 85, 0.15);
-        border-color: rgba(254, 44, 85, 0.3);
-      }
-      .sidebar-action.disliked .sidebar-icon svg {
-        fill: var(--primary);
-      }
       @keyframes heartPop {
         0% {
           transform: scale(1);
@@ -291,7 +284,7 @@
       /* 控制栏 */
       .control-bar {
         position: absolute;
-        bottom: 0;
+        bottom: calc(48px + env(safe-area-inset-bottom, 0px));
         left: 0;
         right: 0;
         height: calc(48px + env(safe-area-inset-bottom, 0px));
@@ -353,6 +346,64 @@
         font-size: 11px;
         color: var(--text-sub);
         font-family: monospace;
+      }
+
+      /* 底部 Tab 栏 */
+      .tab-bar {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: calc(48px + env(safe-area-inset-bottom, 0px));
+        z-index: 40;
+        display: flex;
+        align-items: center;
+        justify-content: space-around;
+        background: rgba(10, 10, 10, 0.92);
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+      }
+      .tab-btn {
+        background: none;
+        border: none;
+        color: rgba(255, 255, 255, 0.6);
+        font-size: 13px;
+        padding: 8px 16px;
+        min-height: 44px;
+        cursor: pointer;
+        border-radius: 20px;
+        transition: color 0.2s;
+      }
+      .tab-btn.active {
+        color: #fff;
+        font-weight: 700;
+      }
+      /* 全屏/旋转时隐藏 Tab 栏并还原控制栏/侧边栏/信息面板位置 */
+      .app.fs-mode .tab-bar,
+      .app.rotated-view .tab-bar {
+        display: none;
+      }
+      .app.fs-mode .control-bar,
+      .app.rotated-view .control-bar {
+        bottom: 0;
+      }
+      .app.fs-mode .sidebar,
+      .app.rotated-view .sidebar {
+        bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+      }
+      .app.fs-mode .info-panel,
+      .app.rotated-view .info-panel {
+        bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+      }
+      @media (min-width: 768px) {
+        .app.fs-mode .sidebar,
+        .app.rotated-view .sidebar {
+          bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+        }
+        .app.fs-mode .info-panel,
+        .app.rotated-view .info-panel {
+          bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+        }
       }
 
       /* 进度条 */
@@ -688,6 +739,12 @@
         </div>
       </div>
 
+      <div class="tab-bar" id="tabBar">
+        <button class="tab-btn active" data-tab="all">全部</button>
+        <button class="tab-btn" data-tab="fav">收藏</button>
+        <button class="tab-btn" data-tab="trash">已删除</button>
+      </div>
+
       <div id="playOverlay"></div>
     </div>
 
@@ -728,7 +785,8 @@
       const SH = `<svg viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/></svg>`;
       const ST = `<svg viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>`;
       const MU = `<svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>`;
-      const DD = `<svg viewBox="0 0 24 24"><path d="M15 3H6c-.83 0-1.54.5-1.84 1.22l-3.02 7.05c-.09.23-.14.47-.14.73v2c0 1.1.9 2 2 2h6.31l-.95 4.57-.03.32c0 .41.17.79.44 1.06L9.83 23l6.59-6.59c.36-.36.58-.86.58-1.41V5c0-1.1-.9-2-2-2zm4 0v12h4V3h-4z"/></svg>`;
+      const DEL = `<svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>`;
+      const RST = `<svg viewBox="0 0 24 24"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>`;
 
       const PLAY_ICON = `<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`;
       const PAUSE_ICON = `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>`;
@@ -740,13 +798,7 @@
       const items = [];
       const liked = new Set(loadState().liked);
       const fav = new Set(loadState().fav);
-      let favOnly = false;
-      const DISLIKE_MS = 5 * 60 * 1000;
-      const dislikeDeadlines = new Map(); // 文件名 -> 到期时间戳
-      function fmtCountdown(ms) {
-        const s = Math.max(0, Math.ceil(ms / 1000));
-        return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
-      }
+      let currentTab = "all";
       let feedEl,
         currentIdx = 0,
         isMuted = true;
@@ -997,7 +1049,7 @@
         div.addEventListener("pointerdown", (e) => {
           if (
             e.target.closest(
-              ".sidebar, .info-panel, .control-bar",
+              ".sidebar, .info-panel, .control-bar, .tab-bar",
             )
           )
             return;
@@ -1043,7 +1095,7 @@
         div.addEventListener("click", (e) => {
           if (
             e.target.closest(
-              ".sidebar, .info-panel, .control-bar",
+              ".sidebar, .info-panel, .control-bar, .tab-bar",
             )
           )
             return;
@@ -1065,122 +1117,189 @@
         const sidebar = document.createElement("div");
         sidebar.className = "sidebar";
 
-        // 点赞
-        const likeEl = document.createElement("div");
-        likeEl.className = "sidebar-action";
-        likeEl.innerHTML = `<div class="sidebar-icon">${H}</div><span class="sidebar-label">赞</span>`;
-        if (liked.has(item.name)) {
-          likeEl.classList.add("liked");
-          likeEl.querySelector(".sidebar-label").textContent = "已赞";
-        }
-        likeEl.addEventListener("click", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          toggleLike(likeEl, item.name);
-        });
-        sidebar.appendChild(likeEl);
+        if (currentTab === "trash") {
+          // 还原
+          const reEl = document.createElement("div");
+          reEl.className = "sidebar-action";
+          reEl.innerHTML = `<div class="sidebar-icon">${RST}</div><span class="sidebar-label">还原</span>`;
+          reEl.addEventListener("click", async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            try {
+              const r = await fetch("/api/trash", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "restore", name: item.name }),
+              });
+              if (!r.ok) {
+                console.error("还原失败", r.status);
+                return;
+              }
+              removeSlide(item.name);
+              if (feedEl.querySelectorAll(".slide").length === 0) renderFeed();
+            } catch (err) {
+              console.error(err);
+            }
+          });
+          sidebar.appendChild(reEl);
 
-        // 不喜欢（5分钟延迟删除）
-        const ddEl = document.createElement("div");
-        ddEl.className = "sidebar-action";
-        ddEl.dataset.name = item.name;
-        ddEl.innerHTML = `<div class="sidebar-icon">${DD}</div><span class="sidebar-label">不喜欢</span>`;
-        ddEl.addEventListener("click", async (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          const active = ddEl.classList.contains("disliked");
-          try {
-            await fetch("/api/dislike", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ name: item.name, action: active ? "cancel" : "schedule" }),
-            });
-          } catch (err) {
-            return; // 请求失败保持原状
+          // 删除全部
+          const purgeEl = document.createElement("div");
+          purgeEl.className = "sidebar-action";
+          purgeEl.innerHTML = `<div class="sidebar-icon">${DEL}</div><span class="sidebar-label">删除全部</span>`;
+          purgeEl.addEventListener("click", async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!confirm("确定永久删除回收站中的全部文件？此操作不可恢复"))
+              return;
+            try {
+              await fetch("/api/trash", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "purge" }),
+              });
+              renderFeed();
+            } catch (err) {
+              console.error(err);
+            }
+          });
+          sidebar.appendChild(purgeEl);
+        } else if (currentTab === "fav") {
+          // 取消收藏
+          const unfavEl = document.createElement("div");
+          unfavEl.className = "sidebar-action";
+          unfavEl.innerHTML = `<div class="sidebar-icon">${ST}</div><span class="sidebar-label">取消收藏</span>`;
+          unfavEl.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (fav.has(item.name)) {
+              fav.delete(item.name);
+              saveState();
+              removeSlide(item.name, true);
+              if (feedEl.querySelectorAll(".slide").length === 0) renderFeed();
+            }
+          });
+          sidebar.appendChild(unfavEl);
+        } else {
+          // 点赞
+          const likeEl = document.createElement("div");
+          likeEl.className = "sidebar-action";
+          likeEl.innerHTML = `<div class="sidebar-icon">${H}</div><span class="sidebar-label">赞</span>`;
+          if (liked.has(item.name)) {
+            likeEl.classList.add("liked");
+            likeEl.querySelector(".sidebar-label").textContent = "已赞";
           }
-          if (active) {
-            ddEl.classList.remove("disliked");
-            dislikeDeadlines.delete(item.name);
-            ddEl.querySelector(".sidebar-label").textContent = "不喜欢";
-          } else {
-            ddEl.classList.add("disliked");
-            dislikeDeadlines.set(item.name, Date.now() + DISLIKE_MS);
-            ddEl.querySelector(".sidebar-label").textContent = "取消 " + fmtCountdown(DISLIKE_MS);
-          }
-        });
-        sidebar.appendChild(ddEl);
+          likeEl.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleLike(likeEl, item.name);
+          });
+          sidebar.appendChild(likeEl);
 
-        // 分享
-        const shEl = document.createElement("div");
-        shEl.className = "sidebar-action";
-        shEl.innerHTML = `<div class="sidebar-icon">${SH}</div><span class="sidebar-label">分享</span>`;
-        shEl.addEventListener("click", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          const url = window.location.origin + "/" + item.url;
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(url)
-              .then(() => alert("链接已复制！"))
-              .catch(() => alert("复制失败"));
-          } else {
-            prompt("复制链接：", url);
-          }
-        });
-        sidebar.appendChild(shEl);
+          // 删除（移入回收站）
+          const delEl = document.createElement("div");
+          delEl.className = "sidebar-action";
+          delEl.innerHTML = `<div class="sidebar-icon">${DEL}</div><span class="sidebar-label">删除</span>`;
+          delEl.addEventListener("click", async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            try {
+              const r = await fetch("/api/delete", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name: item.name }),
+              });
+              if (!r.ok) {
+                console.error("删除失败", r.status);
+                return;
+              }
+              removeSlide(item.name);
+            } catch (err) {
+              console.error(err);
+            }
+          });
+          sidebar.appendChild(delEl);
 
-        // 收藏
-        const favEl = document.createElement("div");
-        favEl.className = "sidebar-action";
-        favEl.innerHTML = `<div class="sidebar-icon">${ST}</div><span class="sidebar-label">收藏</span>`;
-        if (fav.has(item.name)) {
-          favEl.classList.add("favd");
-          favEl.querySelector(".sidebar-label").textContent = "已收藏";
-        }
-        favEl.addEventListener("click", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          const lbl = favEl.querySelector(".sidebar-label");
+          // 收藏
+          const favEl = document.createElement("div");
+          favEl.className = "sidebar-action";
+          favEl.innerHTML = `<div class="sidebar-icon">${ST}</div><span class="sidebar-label">收藏</span>`;
           if (fav.has(item.name)) {
-            fav.delete(item.name);
-            favEl.classList.remove("favd");
-            lbl.textContent = "收藏";
-          } else {
-            fav.add(item.name);
             favEl.classList.add("favd");
-            lbl.textContent = "已收藏";
+            favEl.querySelector(".sidebar-label").textContent = "已收藏";
           }
-          saveState();
-          if (favOnly) renderFeed();
-        });
-        sidebar.appendChild(favEl);
+          favEl.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const lbl = favEl.querySelector(".sidebar-label");
+            if (fav.has(item.name)) {
+              fav.delete(item.name);
+              favEl.classList.remove("favd");
+              lbl.textContent = "收藏";
+            } else {
+              fav.add(item.name);
+              favEl.classList.add("favd");
+              lbl.textContent = "已收藏";
+            }
+            saveState();
+          });
+          sidebar.appendChild(favEl);
 
-        // 只看收藏筛选
-        const filterEl = document.createElement("div");
-        filterEl.className = "sidebar-action";
-        filterEl.innerHTML = `<div class="sidebar-icon">${ST}</div><span class="sidebar-label">${favOnly ? "只看收藏" : "全部"}</span>`;
-        filterEl.addEventListener("click", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          favOnly = !favOnly;
-          renderFeed();
-        });
-        sidebar.appendChild(filterEl);
+          // 分享
+          const shEl = document.createElement("div");
+          shEl.className = "sidebar-action";
+          shEl.innerHTML = `<div class="sidebar-icon">${SH}</div><span class="sidebar-label">分享</span>`;
+          shEl.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const url = window.location.origin + "/" + item.url;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(url)
+                .then(() => alert("链接已复制！"))
+                .catch(() => alert("复制失败"));
+            } else {
+              prompt("复制链接：", url);
+            }
+          });
+          sidebar.appendChild(shEl);
+        }
 
         div.appendChild(sidebar);
         return div;
       }
 
-      function renderFeed() {
-        const list = favOnly ? items.filter((i) => fav.has(i.name)) : items;
+      async function renderFeed() {
+        let list;
+        if (currentTab === "fav") {
+          list = items.filter((i) => fav.has(i.name));
+        } else if (currentTab === "trash") {
+          try {
+            const names = await (await fetch("/api/trash")).json();
+            list = names.map((n) => {
+              const ext = n.split(".").pop().toLowerCase();
+              const base = { name: n, url: "trash/" + encodeURIComponent(n) };
+              if (I_EXT.includes(ext)) return { ...base, type: "image" };
+              if (V_EXT.includes(ext))
+                return { ...base, type: "video", mime: MIME[ext] || "video/mp4" };
+              if (A_EXT.includes(ext))
+                return { ...base, type: "audio", mime: MIME[ext] || "audio/mpeg" };
+              return base;
+            });
+          } catch {
+            list = [];
+          }
+        } else {
+          list = items;
+        }
         feedEl.innerHTML = "";
         if (list.length === 0) {
-          feedEl.innerHTML = `<div style="display:flex;height:100%;align-items:center;justify-content:center;"><div class="empty"><div class="empty-icon">⭐</div><h3 style="color:#fff;margin-bottom:8px;">还没有收藏的视频</h3><p style="font-size:12px;">点右侧星标收藏，再切到「只看收藏」</p><button id="emptyShowAll" style="margin-top:16px;padding:12px 28px;min-height:44px;font-size:14px;font-weight:600;color:#fff;background:var(--primary);border:none;border-radius:22px;cursor:pointer;">查看全部</button></div></div>`;
-          feedEl
-            .querySelector("#emptyShowAll")
-            .addEventListener("click", () => {
-              favOnly = false;
-              renderFeed();
-            });
+          const msg =
+            currentTab === "fav"
+              ? "还没有收藏的视频"
+              : currentTab === "trash"
+                ? "回收站是空的"
+                : "暂无视频";
+          feedEl.innerHTML = `<div style="display:flex;height:100%;align-items:center;justify-content:center;"><div class="empty"><div class="empty-icon">📂</div><h3 style="color:#fff;margin-bottom:8px;">${msg}</h3></div></div>`;
           return;
         }
         list.forEach((item, i) => feedEl.appendChild(createSlide(item, i)));
@@ -1189,7 +1308,7 @@
         setActiveSlide(0);
       }
 
-      function removeSlide(name) {
+      function removeSlide(name, keepInItems) {
         const slides = feedEl.querySelectorAll(".slide");
         const idx = Array.prototype.indexOf.call(
           slides,
@@ -1198,8 +1317,7 @@
         if (idx === -1) return;
         slides[idx].remove();
         const i2 = items.findIndex((it) => it.name === name);
-        if (i2 !== -1) items.splice(i2, 1);
-        dislikeDeadlines.delete(name);
+        if (i2 !== -1 && !keepInItems) items.splice(i2, 1);
         const count = feedEl.querySelectorAll(".slide").length;
         if (count === 0) {
           feedEl.innerHTML = `<div style="display:flex;height:100%;align-items:center;justify-content:center;"><div class="empty"><div class="empty-icon">🗑️</div><h3 style="color:#fff;margin-bottom:8px;">没有视频了</h3></div></div>`;
@@ -1213,6 +1331,14 @@
           setActiveSlide(currentIdx);
           feedEl.scrollTop = currentIdx * feedEl.clientHeight;
         }
+      }
+
+      function switchTab(tab) {
+        currentTab = tab;
+        document.querySelectorAll("#tabBar .tab-btn").forEach((b) => {
+          b.classList.toggle("active", b.dataset.tab === tab);
+        });
+        renderFeed();
       }
 
       async function boot() {
@@ -1254,11 +1380,6 @@
           });
         } catch (e) {
           console.error(e);
-        }
-
-        if (items.length === 0) {
-          feedEl.innerHTML = `<div style="display:flex;height:100%;align-items:center;justify-content:center;"><div class="empty"><div class="empty-icon">📂</div><h3 style="color:#fff;margin-bottom:8px;">暂无视频</h3><p style="font-size:12px;">请将视频放入 media/ 目录</p></div></div>`;
-          return;
         }
 
         shuffle(items);
@@ -1309,9 +1430,22 @@
           e.stopPropagation();
           toggleRotate();
         };
-        document.addEventListener("fullscreenchange", syncFsIcon);
-        document.addEventListener("webkitfullscreenchange", syncFsIcon);
-        syncFsIcon();
+        // 全屏状态联动：切换 fs-mode 类（隐藏 tab 栏、还原控制栏位置）
+        const syncFsUi = () => {
+          syncFsIcon();
+          document.getElementById("app").classList.toggle("fs-mode", isFs());
+        };
+        document.addEventListener("fullscreenchange", syncFsUi);
+        document.addEventListener("webkitfullscreenchange", syncFsUi);
+        syncFsUi();
+
+        // Tab 栏绑定
+        document.querySelectorAll("#tabBar .tab-btn").forEach((btn) => {
+          btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            switchTab(btn.dataset.tab);
+          });
+        });
 
         function reshuffle() {
           shuffle(items);
@@ -1467,24 +1601,6 @@
         setInterval(() => {
           if (!drag) syncBar();
         }, 250);
-
-        // 不喜欢倒计时：每秒刷新标签，归零后移除对应视频
-        setInterval(() => {
-          document
-            .querySelectorAll(".sidebar-action.disliked")
-            .forEach((btn) => {
-              const name = btn.dataset.name;
-              const deadline = dislikeDeadlines.get(name);
-              if (!deadline) return;
-              const remain = deadline - Date.now();
-              if (remain > 0) {
-                btn.querySelector(".sidebar-label").textContent =
-                  "取消 " + fmtCountdown(remain);
-              } else {
-                removeSlide(name);
-              }
-            });
-        }, 1000);
 
         updateRotateBtn();
 

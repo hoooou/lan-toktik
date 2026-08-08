@@ -5,9 +5,9 @@ const fs = require("fs");
 const path = require("path");
 
 const PORT = parseInt(process.env.PORT || "8080", 10);
-const DISLIKE_MS = parseInt(process.env.DISLIKE_MS || "300000", 10);
 const PROJECT_ROOT = __dirname;
 const MEDIA_FOLDER = path.join(PROJECT_ROOT, "media");
+const TRASH_DIR = path.join(PROJECT_ROOT, ".trash");
 const MAX_BODY = 64 * 1024; // 请求体大小上限
 
 // 各文件类型的 Content-Type 对照
@@ -47,11 +47,13 @@ const RANGE_SUPPORTED = new Set([
   ".ogg",
 ]);
 
-// 待删除队列：文件名 -> 定时器句柄
-const pendingDeletes = new Map();
-
 function mimeOf(ext) {
   return CONTENT_TYPES[ext] || "application/octet-stream";
+}
+
+// 名字校验：仅允许普通文件名，杜绝路径穿越
+function isPlainName(name) {
+  return typeof name === "string" && name.length > 0 && path.basename(name) === name;
 }
 
 // 最小化的错误回复：只给状态码与一行正文
@@ -60,30 +62,20 @@ function replyPlain(res, statusCode, body) {
   res.end(body);
 }
 
-// 成功回复 JSON
-function replyOk(res) {
+// JSON 回复
+function replyJson(res, obj) {
   res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
-  res.end(JSON.stringify({ ok: true }));
+  res.end(JSON.stringify(obj));
 }
 
-// 输出媒体目录下的文件名列表（隐藏文件与待删除文件除外）
-function emitFileList(res) {
-  try {
-    const names = fs
-      .readdirSync(MEDIA_FOLDER)
-      .filter(
-        (name) => !name.startsWith(".") && !pendingDeletes.has(name),
-      );
-    res.writeHead(200, {
-      "Content-Type": "application/json; charset=utf-8",
-      "Access-Control-Allow-Origin": "*",
-    });
-    res.end(JSON.stringify(names));
-  } catch {
-    // 目录缺失或不可读时按空列表处理
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end("[]");
-  }
+function replyOk(res) {
+  replyJson(res, { ok: true });
+}
+
+// 确保回收站目录存在（懒创建）
+function ensureTrash() {
+  fs.mkdirSync(TRASH_DIR, { recursive: true });
+  return TRASH_DIR;
 }
 
 // 读取请求体（受大小限制）
@@ -104,49 +96,125 @@ function readBody(req) {
   });
 }
 
-// 处理不喜欢接口：schedule 安排延迟删除，cancel 撤销删除
-async function handleDislike(req, res) {
-  const raw = await readBody(req);
-  let body;
+// 输出媒体目录下的文件名列表（隐藏文件除外）
+function emitFileList(res) {
   try {
-    body = JSON.parse(raw || "{}");
+    const names = fs
+      .readdirSync(MEDIA_FOLDER)
+      .filter((name) => !name.startsWith("."));
+    res.writeHead(200, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Access-Control-Allow-Origin": "*",
+    });
+    res.end(JSON.stringify(names));
+  } catch {
+    // 目录缺失或不可读时按空列表处理
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end("[]");
+  }
+}
+
+// 输出回收站文件名列表（隐藏文件除外）
+function emitTrashList(res) {
+  try {
+    const names = fs
+      .readdirSync(ensureTrash())
+      .filter((name) => !name.startsWith("."));
+    replyJson(res, names);
+  } catch {
+    replyJson(res, []);
+  }
+}
+
+// 删除接口：media/name 移入回收站
+async function handleDelete(req, res) {
+  const raw = await readBody(req);
+  let payload;
+  try {
+    payload = JSON.parse(raw || "{}");
   } catch {
     replyPlain(res, 400, "Bad request");
     return;
   }
-  const name = typeof body.name === "string" ? body.name : "";
-  if (!name || path.basename(name) !== name) {
+  const name = payload.name;
+  if (!isPlainName(name)) {
     replyPlain(res, 400, "Bad request");
     return;
   }
-  const filePath = path.join(MEDIA_FOLDER, name);
-  const action = body.action === "cancel" ? "cancel" : "schedule";
+  ensureTrash();
+  const src = path.join(MEDIA_FOLDER, name);
+  const dst = path.join(TRASH_DIR, name);
+  if (!fs.existsSync(src)) {
+    replyPlain(res, 404, "Not found");
+    return;
+  }
+  if (fs.existsSync(dst)) {
+    replyPlain(res, 409, "Conflict");
+    return;
+  }
+  try {
+    fs.renameSync(src, dst);
+  } catch {
+    replyPlain(res, 500, "Server error");
+    return;
+  }
+  replyOk(res);
+}
 
-  if (action === "cancel") {
-    const timer = pendingDeletes.get(name);
-    if (timer) {
-      clearTimeout(timer);
-      pendingDeletes.delete(name);
+// 回收站操作：restore 还原、purge 清空
+async function handleTrashPost(req, res) {
+  const raw = await readBody(req);
+  let payload;
+  try {
+    payload = JSON.parse(raw || "{}");
+  } catch {
+    replyPlain(res, 400, "Bad request");
+    return;
+  }
+
+  if (payload.action === "restore") {
+    const name = payload.name;
+    if (!isPlainName(name)) {
+      replyPlain(res, 400, "Bad request");
+      return;
+    }
+    ensureTrash();
+    const src = path.join(TRASH_DIR, name);
+    const dst = path.join(MEDIA_FOLDER, name);
+    if (!fs.existsSync(src)) {
+      replyPlain(res, 404, "Not found");
+      return;
+    }
+    if (fs.existsSync(dst)) {
+      replyPlain(res, 409, "Conflict");
+      return;
+    }
+    try {
+      fs.renameSync(src, dst);
+    } catch {
+      replyPlain(res, 500, "Server error");
+      return;
     }
     replyOk(res);
     return;
   }
 
-  // schedule：文件必须真实存在；已安排过则幂等返回
-  if (!fs.existsSync(filePath)) {
-    replyPlain(res, 404, "Not found");
+  if (payload.action === "purge") {
+    let deleted = 0;
+    for (const name of fs.readdirSync(ensureTrash())) {
+      if (name.startsWith(".")) continue;
+      try {
+        fs.unlinkSync(path.join(TRASH_DIR, name));
+        deleted += 1;
+      } catch {
+        // 单个失败忽略，继续清空其余
+      }
+    }
+    replyJson(res, { ok: true, deleted });
     return;
   }
-  if (pendingDeletes.has(name)) {
-    replyOk(res);
-    return;
-  }
-  const timer = setTimeout(() => {
-    pendingDeletes.delete(name);
-    fs.unlink(filePath, () => {});
-  }, DISLIKE_MS);
-  pendingDeletes.set(name, timer);
-  replyOk(res);
+
+  replyPlain(res, 400, "Bad request");
 }
 
 // 解析 Range 头并做边界收窄：越界截断、起点修正
@@ -194,17 +262,71 @@ function deliver(res, filePath, size, mime, rangeHeader, rangeEnabled) {
   pump(res, filePath, 0, size - 1);
 }
 
+// 从指定目录按文件名提供文件（MIME/Range 与媒体一致）
+function serveFromDir(req, res, folder, name) {
+  const filePath = path.join(folder, name);
+  if (!filePath.startsWith(folder)) {
+    replyPlain(res, 403, "Forbidden");
+    return;
+  }
+  fs.stat(filePath, (err, info) => {
+    if (err || !info.isFile()) {
+      replyPlain(res, 404, "Not found");
+      return;
+    }
+    const ext = path.extname(filePath).toLowerCase();
+    deliver(
+      res,
+      filePath,
+      info.size,
+      mimeOf(ext),
+      req.headers.range,
+      RANGE_SUPPORTED.has(ext),
+    );
+  });
+}
+
 // 请求路由：先处理接口与目录列表，再走静态文件流程
 async function routeRequest(req, res) {
   const decoded = decodeURIComponent(req.url.split("?")[0]);
   const requestPath = decoded === "/" ? "/index.html" : decoded;
 
-  if (requestPath === "/api/dislike") {
+  if (requestPath === "/api/delete") {
     if (req.method !== "POST") {
       replyPlain(res, 404, "Not found");
       return;
     }
-    await handleDislike(req, res);
+    await handleDelete(req, res);
+    return;
+  }
+
+  if (requestPath === "/api/trash") {
+    if (req.method === "GET") {
+      emitTrashList(res);
+      return;
+    }
+    if (req.method === "POST") {
+      await handleTrashPost(req, res);
+      return;
+    }
+    replyPlain(res, 404, "Not found");
+    return;
+  }
+
+  // 回收站内文件的播放路径
+  if (requestPath.startsWith("/trash/")) {
+    const name = requestPath.slice("/trash/".length);
+    if (!isPlainName(name)) {
+      replyPlain(res, 404, "Not found");
+      return;
+    }
+    serveFromDir(req, res, TRASH_DIR, name);
+    return;
+  }
+
+  // 禁止直接访问回收站目录本身，防绕过
+  if (requestPath.startsWith("/.trash")) {
+    replyPlain(res, 404, "Not found");
     return;
   }
 
@@ -213,27 +335,7 @@ async function routeRequest(req, res) {
     return;
   }
 
-  const resolved = path.join(PROJECT_ROOT, requestPath);
-  if (!resolved.startsWith(PROJECT_ROOT)) {
-    replyPlain(res, 403, "Forbidden");
-    return;
-  }
-
-  fs.stat(resolved, (err, info) => {
-    if (err || !info.isFile()) {
-      replyPlain(res, 404, "Not found");
-      return;
-    }
-    const ext = path.extname(resolved).toLowerCase();
-    deliver(
-      res,
-      resolved,
-      info.size,
-      mimeOf(ext),
-      req.headers.range,
-      RANGE_SUPPORTED.has(ext),
-    );
-  });
+  serveFromDir(req, res, PROJECT_ROOT, requestPath);
 }
 
 // 组装服务实例（供主进程与测试共用）
@@ -247,4 +349,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { createServer, PORT, DISLIKE_MS, pendingDeletes };
+module.exports = { createServer, PORT, TRASH_DIR };
