@@ -8,7 +8,6 @@ const PORT = parseInt(process.env.PORT || "8080", 10);
 const DISLIKE_MS = parseInt(process.env.DISLIKE_MS || "300000", 10);
 const PROJECT_ROOT = __dirname;
 const MEDIA_FOLDER = path.join(PROJECT_ROOT, "media");
-const MAX_CHUNK = 4 * 1024 * 1024; // 单次范围响应上限 4MB
 const MAX_BODY = 64 * 1024; // 请求体大小上限
 
 // 各文件类型的 Content-Type 对照
@@ -150,14 +149,14 @@ async function handleDislike(req, res) {
   replyOk(res);
 }
 
-// 解析 Range 头并做边界收窄：越界截断、起点修正、分片限长
+// 解析 Range 头并做边界收窄：越界截断、起点修正
+// 按请求的完整范围响应，避免分片过小导致串行往返降低吞吐
 function resolveRange(rawHeader, fileSize) {
   const [startText, endText] = rawHeader.replace(/bytes=/, "").split("-");
   let begin = parseInt(startText, 10) || 0;
   let finish = endText ? parseInt(endText, 10) : fileSize - 1;
   if (finish >= fileSize) finish = fileSize - 1;
   if (begin > finish) begin = finish;
-  if (finish - begin + 1 > MAX_CHUNK) finish = begin + MAX_CHUNK - 1;
   return { begin, finish };
 }
 
