@@ -1,0 +1,12 @@
+{
+  "name": "lan-toktik",
+  "version": "1.0.0",
+  "description": "本地局域网抖音式短视频流播放器：手机浏览器以竖屏滑动流观看电脑上的本地视频",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=16"
+  }
+}

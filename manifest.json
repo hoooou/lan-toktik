@@ -1,0 +1,8 @@
+{
+  "name": "局域网视频流",
+  "short_name": "视频流",
+  "display": "standalone",
+  "start_url": "/",
+  "background_color": "#000000",
+  "theme_color": "#000000"
+}
