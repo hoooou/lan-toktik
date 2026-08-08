@@ -1135,8 +1135,15 @@
                 console.error("还原失败", r.status);
                 return;
               }
+              await loadMediaItems();
               removeSlide(item.name);
-              if (feedEl.querySelectorAll(".slide").length === 0) renderFeed();
+              if (
+                feedEl.querySelectorAll(".slide").length === 0 ||
+                currentTab === "all" ||
+                currentTab === "fav"
+              ) {
+                renderFeed();
+              }
             } catch (err) {
               console.error(err);
             }
@@ -1153,11 +1160,12 @@
             if (!confirm("确定永久删除回收站中的全部文件？此操作不可恢复"))
               return;
             try {
-              await fetch("/api/trash", {
+              const r = await fetch("/api/trash", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ action: "purge" }),
               });
+              if (!r.ok) return;
               renderFeed();
             } catch (err) {
               console.error(err);
@@ -1273,33 +1281,34 @@
         if (currentTab === "fav") {
           list = items.filter((i) => fav.has(i.name));
         } else if (currentTab === "trash") {
+          let names = [];
           try {
-            const names = await (await fetch("/api/trash")).json();
-            list = names.map((n) => {
-              const ext = n.split(".").pop().toLowerCase();
-              const base = { name: n, url: "trash/" + encodeURIComponent(n) };
-              if (I_EXT.includes(ext)) return { ...base, type: "image" };
-              if (V_EXT.includes(ext))
-                return { ...base, type: "video", mime: MIME[ext] || "video/mp4" };
-              if (A_EXT.includes(ext))
-                return { ...base, type: "audio", mime: MIME[ext] || "audio/mpeg" };
-              return base;
-            });
-          } catch {
-            list = [];
-          }
+            names = await (await fetch("/api/trash")).json();
+          } catch {}
+          // 竞态守卫：等待期间用户已切换 tab，丢弃本次结果
+          if (currentTab !== "trash") return;
+          list = names.map((n) => {
+            const ext = n.split(".").pop().toLowerCase();
+            const base = { name: n, url: "trash/" + encodeURIComponent(n) };
+            if (I_EXT.includes(ext)) return { ...base, type: "image" };
+            if (V_EXT.includes(ext))
+              return { ...base, type: "video", mime: MIME[ext] || "video/mp4" };
+            if (A_EXT.includes(ext))
+              return { ...base, type: "audio", mime: MIME[ext] || "audio/mpeg" };
+            return base;
+          });
         } else {
           list = items;
         }
         feedEl.innerHTML = "";
         if (list.length === 0) {
-          const msg =
-            currentTab === "fav"
-              ? "还没有收藏的视频"
-              : currentTab === "trash"
-                ? "回收站是空的"
-                : "暂无视频";
-          feedEl.innerHTML = `<div style="display:flex;height:100%;align-items:center;justify-content:center;"><div class="empty"><div class="empty-icon">📂</div><h3 style="color:#fff;margin-bottom:8px;">${msg}</h3></div></div>`;
+          if (currentTab === "fav") {
+            feedEl.innerHTML = `<div style="display:flex;height:100%;align-items:center;justify-content:center;"><div class="empty"><div class="empty-icon">⭐</div><h3 style="color:#fff;margin-bottom:8px;">还没有收藏的视频</h3></div></div>`;
+          } else if (currentTab === "trash") {
+            feedEl.innerHTML = `<div style="display:flex;height:100%;align-items:center;justify-content:center;"><div class="empty"><div class="empty-icon">📂</div><h3 style="color:#fff;margin-bottom:8px;">回收站是空的</h3></div></div>`;
+          } else {
+            feedEl.innerHTML = `<div style="display:flex;height:100%;align-items:center;justify-content:center;"><div class="empty"><div class="empty-icon">📂</div><h3 style="color:#fff;margin-bottom:8px;">暂无视频</h3><p style="font-size:12px;">请将视频放入 media/ 目录</p></div></div>`;
+          }
           return;
         }
         list.forEach((item, i) => feedEl.appendChild(createSlide(item, i)));
@@ -1341,17 +1350,9 @@
         renderFeed();
       }
 
-      async function boot() {
-        feedEl = document.getElementById("feed");
-        const app = document.getElementById("app");
-
-        // 阻止控制栏点击穿透到幻灯片
-        const cBar = document.getElementById("controlBar");
-        ["pointerdown", "pointerup", "mousedown", "click"].forEach((ev) => {
-          cBar.addEventListener(ev, (e) => e.stopPropagation());
-        });
-
-        // 加载媒体
+      // 拉取 media 目录并重建 items（供启动与还原后同步使用）
+      async function loadMediaItems() {
+        items.length = 0;
         try {
           const res = await fetch(`/${MEDIA_DIR}/`);
           const files = await res.json();
@@ -1381,6 +1382,20 @@
         } catch (e) {
           console.error(e);
         }
+      }
+
+      async function boot() {
+        feedEl = document.getElementById("feed");
+        const app = document.getElementById("app");
+
+        // 阻止控制栏点击穿透到幻灯片
+        const cBar = document.getElementById("controlBar");
+        ["pointerdown", "pointerup", "mousedown", "click"].forEach((ev) => {
+          cBar.addEventListener(ev, (e) => e.stopPropagation());
+        });
+
+        // 加载媒体
+        await loadMediaItems();
 
         shuffle(items);
         renderFeed();
