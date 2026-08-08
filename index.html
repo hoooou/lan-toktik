@@ -68,7 +68,6 @@
         overflow: hidden;
       }
 
-      /* Prevent .slide width from overflowing on desktop */
       /* 防止.slide宽度在桌面端溢出 */
       @media (min-width: 768px) {
         .slide {
@@ -135,7 +134,6 @@
         }
       }
 
-      /* Vignette mask */
       /* 暗角遮罩 */
       .slide::after {
         content: "";
@@ -152,7 +150,6 @@
         z-index: 2;
       }
 
-      /* Audio placeholder */
       /* 音频占位 */
       .audio-placeholder {
         position: absolute;
@@ -170,7 +167,6 @@
         filter: drop-shadow(0 4px 20px rgba(0, 0, 0, 0.4));
       }
 
-      /* Info panel */
       /* 信息面板 */
       .info-panel {
         position: absolute;
@@ -201,7 +197,6 @@
         overflow-wrap: break-word;
       }
 
-      /* Sidebar */
       /* 侧边栏 */
       .sidebar {
         position: absolute;
@@ -285,7 +280,6 @@
         }
       }
 
-      /* Control bar */
       /* 控制栏 */
       .control-bar {
         position: absolute;
@@ -353,7 +347,6 @@
         font-family: monospace;
       }
 
-      /* Seek bar */
       /* 进度条 */
       .seek-wrap {
         position: absolute;
@@ -415,7 +408,6 @@
         display: block;
       }
 
-      /* Play/pause overlay animation */
       /* 播放暂停覆盖动画 */
       #playOverlay {
         position: fixed;
@@ -475,7 +467,6 @@
         }
       }
 
-      /* Speed HUD */
       /* 倍速提示 */
       #speedHud {
         position: fixed;
@@ -497,7 +488,6 @@
         opacity: 1;
       }
 
-      /* Spinner */
       /* 加载动画 */
       .spinner {
         position: absolute;
@@ -522,7 +512,6 @@
         }
       }
 
-      /* Unmute alert */
       /* 取消静音提示 */
       .unmute-alert {
         position: absolute;
@@ -544,7 +533,6 @@
         transition: opacity 0.25s;
       }
 
-      /* Keyboard legend */
       /* 键盘快捷键图例 */
       .kbd-legend {
         position: fixed;
@@ -778,7 +766,6 @@
 
       function setActiveSlide(idx) {
         currentIdx = idx;
-        // Pause ALL media except current
         // 暂停除当前外的所有媒体
         const slides = feedEl.querySelectorAll(".slide");
         slides.forEach((s, i) => {
@@ -981,7 +968,6 @@
           div.appendChild(ph);
         }
 
-        // Long press for 2x speed
         // 长按2倍速
         const hud = document.getElementById("speedHud");
         let longPressFired = false;
@@ -1046,19 +1032,16 @@
           if (v) togglePlay(v);
         });
 
-        // Info panel
         // 信息面板
         const info = document.createElement("div");
         info.className = "info-panel";
         info.innerHTML = `<div class="video-desc">${escapeHtml(item.name)}</div>`;
         div.appendChild(info);
 
-        // Sidebar
         // 侧边栏
         const sidebar = document.createElement("div");
         sidebar.className = "sidebar";
 
-        // Like
         // 点赞
         const likeEl = document.createElement("div");
         likeEl.className = "sidebar-action";
@@ -1074,7 +1057,6 @@
         });
         sidebar.appendChild(likeEl);
 
-        // Share
         // 分享
         const shEl = document.createElement("div");
         shEl.className = "sidebar-action";
@@ -1158,14 +1140,12 @@
         feedEl = document.getElementById("feed");
         const app = document.getElementById("app");
 
-        // Prevent control bar clicks from reaching slides
         // 阻止控制栏点击穿透到幻灯片
         const cBar = document.getElementById("controlBar");
         ["pointerdown", "pointerup", "mousedown", "click"].forEach((ev) => {
           cBar.addEventListener(ev, (e) => e.stopPropagation());
         });
 
-        // Load media
         // 加载媒体
         try {
           const res = await fetch(`/${MEDIA_DIR}/`);
@@ -1220,7 +1200,6 @@
         if (isMuted)
           document.getElementById("unmuteAlert").style.display = "flex";
 
-        // Control buttons
         // 控制按钮
         document.getElementById("btnPrev").onclick = (e) => {
           e.stopPropagation();
@@ -1261,7 +1240,6 @@
           showControls();
         }
 
-        // Seeker
         // 进度条
         const seekWrap = document.getElementById("seekWrap");
         const seekTip = document.getElementById("seekTip");
@@ -1357,14 +1335,12 @@
           }
         });
 
-        // Initial
         // 初始化
         setActiveSlide(0);
         showControls();
         app.addEventListener("mousemove", showControls);
         window.addEventListener("resize", handleScroll);
 
-        // Keyboard
         // 键盘
         document.addEventListener("keydown", (e) => {
           const v = curMedia();
@@ -1408,7 +1384,6 @@
           }
         });
 
-        // Progress poll
         // 进度轮询
         setInterval(() => {
           if (!drag) syncBar();

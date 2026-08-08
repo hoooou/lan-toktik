@@ -44,7 +44,6 @@ http
     let url = decodeURIComponent(req.url.split("?")[0]);
     if (url === "/") url = "/index.html";
 
-    // List media directory as JSON
     // 列出媒体目录为JSON
     if (url === "/media/" || url === "/media") {
       try {
@@ -83,7 +82,6 @@ http
       const hasRange = RANGE_EXTS.has(ext);
       const totalSize = stat.size;
 
-      // Always support range for video/audio; for images only if range header present
       // 视频音频始终支持范围请求
       if (req.headers.range && hasRange) {
         const range = req.headers.range.replace(/bytes=/, "");
@@ -91,11 +89,9 @@ http
         let start = parseInt(parts[0], 10) || 0;
         let end = parts[1] ? parseInt(parts[1], 10) : totalSize - 1;
 
-        // Clamp end
         // 限制结束位置
         if (end >= totalSize) end = totalSize - 1;
         if (start > end) start = end;
-        // Limit chunk to 4MB for stability
         // 限制分片为4MB以确保稳定性
         if (end - start > 4 * 1024 * 1024) end = start + 4 * 1024 * 1024 - 1;
 
@@ -117,7 +113,6 @@ http
           })
           .pipe(res);
       } else {
-        // Full response
         // 完整响应
         res.writeHead(200, {
           "Content-Type": mime,
