@@ -1135,8 +1135,10 @@
                 console.error("还原失败", r.status);
                 return;
               }
+              // 先移除回收站里的 slide（keepInItems 跳过 items 的 splice，
+              // 因为刚还原的文件还没进 items），再重建列表把该视频加回来
+              removeSlide(item.name, true);
               await loadMediaItems();
-              removeSlide(item.name);
               if (
                 feedEl.querySelectorAll(".slide").length === 0 ||
                 currentTab === "all" ||
@@ -1351,12 +1353,18 @@
       }
 
       // 拉取 media 目录并重建 items（供启动与还原后同步使用）
+      // 仅取数成功后才清空重建；失败时保留现有列表，避免误清空
       async function loadMediaItems() {
-        items.length = 0;
+        let files;
         try {
           const res = await fetch(`/${MEDIA_DIR}/`);
-          const files = await res.json();
-          files.forEach((f) => {
+          files = await res.json();
+        } catch (e) {
+          console.error(e);
+          return;
+        }
+        items.length = 0;
+        files.forEach((f) => {
             const ext = f.split(".").pop().toLowerCase();
             if (I_EXT.includes(ext))
               items.push({
@@ -1378,10 +1386,7 @@
                 name: f,
                 mime: MIME[ext] || "audio/mpeg",
               });
-          });
-        } catch (e) {
-          console.error(e);
-        }
+        });
       }
 
       async function boot() {
