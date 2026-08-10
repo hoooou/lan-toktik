@@ -795,6 +795,40 @@
         );
       }
 
+      // ---- 行为埋点：批量上报到 /api/events ----
+      const EV_TYPES = new Set([
+        "like", "unlike", "fav", "unfav", "delete",
+        "watch", "finish", "skip", "speedup", "seek_fwd", "seek_back",
+      ]);
+      let evQueue = [];
+      let evTimer = null;
+      function reportEvent(type, name, extra) {
+        if (!EV_TYPES.has(type)) return;
+        evQueue.push(Object.assign({ type, name }, extra || {}));
+        if (evQueue.length >= 50) flushEvents();
+      }
+      async function flushEvents() {
+        if (!evQueue.length) return;
+        const batch = evQueue;
+        evQueue = [];
+        try {
+          await fetch("/api/events", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ events: batch }),
+          });
+        } catch (e) {
+          console.error(e);
+          evQueue = batch.concat(evQueue); // 失败回队，下次再发
+        }
+      }
+      // 定时与离开页面上报
+      evTimer = setInterval(flushEvents, 30000);
+      window.addEventListener("pagehide", flushEvents);
+      window.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "hidden") flushEvents();
+      });
+
       const H = `<svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`;
       const SH = `<svg viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/></svg>`;
       const ST = `<svg viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>`;
@@ -846,6 +880,18 @@
       }
 
       function setActiveSlide(idx) {
+        // 快速划走埋点：旧 slide 存活 <10s 且已开始播放 → skip
+        const prevSlide = slide(currentIdx);
+        if (
+          prevSlide &&
+          prevSlide.dataset.enteredAt &&
+          Date.now() - Number(prevSlide.dataset.enteredAt) < 10000
+        ) {
+          const pv = prevSlide.querySelector("video");
+          if (pv && pv.currentTime > 0) {
+            reportEvent("skip", prevSlide.dataset.name || "");
+          }
+        }
         currentIdx = idx;
         // 暂停除当前外的所有媒体
         const slides = feedEl.querySelectorAll(".slide");
@@ -990,6 +1036,7 @@
           lbl.textContent = "已赞";
         }
         saveState();
+        reportEvent(liked.has(name) ? "like" : "unlike", name);
       }
 
       function handleScroll() {
@@ -1003,6 +1050,7 @@
         const div = document.createElement("div");
         div.className = "slide";
         div.dataset.name = item.name;
+        div.dataset.enteredAt = String(Date.now());
 
         if (item.type === "image") {
           const img = document.createElement("img");
@@ -1040,6 +1088,20 @@
               video.dataset.landscape = "1";
             if (video === curMedia()) updateRotateBtn();
           });
+          // 观看/完成埋点：watch 5 秒节流；finish 达 90% 仅报一次（loop 视频不触发 ended）
+          let lastWatchReport = 0;
+          let finishReported = false;
+          video.addEventListener("timeupdate", () => {
+            const now = Date.now();
+            if (now - lastWatchReport >= 5000 && video.currentTime > 0) {
+              lastWatchReport = now;
+              reportEvent("watch", item.name, { t: Math.round(video.currentTime) });
+            }
+            if (!finishReported && video.duration && video.currentTime >= video.duration * 0.9) {
+              finishReported = true;
+              reportEvent("finish", item.name);
+            }
+          });
         } else if (item.type === "audio") {
           const audio = document.createElement("audio");
           audio.loop = true;
@@ -1074,6 +1136,7 @@
             if (v && !v.paused) {
               longPressFired = true;
               v.playbackRate = 2;
+              reportEvent("speedup", item.name);
               hud.classList.add("show");
             }
           }, 400);
@@ -1206,6 +1269,7 @@
             if (fav.has(item.name)) {
               fav.delete(item.name);
               saveState();
+              reportEvent("unfav", item.name);
               removeSlide(item.name, true);
               if (feedEl.querySelectorAll(".slide").length === 0) renderFeed();
             }
@@ -1245,6 +1309,7 @@
                 return;
               }
               removeSlide(item.name);
+              reportEvent("delete", item.name);
             } catch (err) {
               console.error(err);
             }
@@ -1273,6 +1338,7 @@
               lbl.textContent = "已收藏";
             }
             saveState();
+            reportEvent(fav.has(item.name) ? "fav" : "unfav", item.name);
           });
           sidebar.appendChild(favEl);
 
@@ -1561,11 +1627,20 @@
         });
 
         let drag = false;
+        // 快进/回看埋点：比较拖动前后位置；跳到 ≥90% 视为 finish（由 timeupdate 覆盖）不再上报
+        function reportSeek(after) {
+          if (window._seekBefore === undefined || after === window._seekBefore) return;
+          if (after >= 0.9) return;
+          const nm = slide(currentIdx)?.dataset.name;
+          if (!nm) return;
+          reportEvent(after > window._seekBefore ? "seek_fwd" : "seek_back", nm);
+        }
         seekWrap.addEventListener("mousedown", (e) => {
           e.preventDefault();
           e.stopPropagation();
           drag = true;
           seekWrap.classList.add("dragging");
+          window._seekBefore = ratio(e);
           previewSeek(ratio(e));
         });
         document.addEventListener("mousemove", (e) => {
@@ -1575,14 +1650,18 @@
           if (drag) {
             drag = false;
             seekWrap.classList.remove("dragging");
-            commitSeek(ratio(e));
+            const after = ratio(e);
+            commitSeek(after);
+            reportSeek(after);
           }
         });
         seekWrap.addEventListener("mouseup", (e) => {
           if (drag) {
             drag = false;
             seekWrap.classList.remove("dragging");
-            commitSeek(ratio(e));
+            const after = ratio(e);
+            commitSeek(after);
+            reportSeek(after);
           }
         });
 
@@ -1590,6 +1669,7 @@
           e.preventDefault();
           drag = true;
           seekWrap.classList.add("dragging");
+          window._seekBefore = ratio({ clientX: e.touches[0].clientX, clientY: e.touches[0].clientY });
           previewSeek(ratio({ clientX: e.touches[0].clientX, clientY: e.touches[0].clientY }));
           showControls();
         });
@@ -1609,6 +1689,7 @@
             if (v && v.duration) {
               const ratioFromBar = parseFloat(seekFill.style.width) / 100;
               v.currentTime = ratioFromBar * v.duration;
+              reportSeek(ratioFromBar);
             }
             drag = false;
             seekWrap.classList.remove("dragging");
@@ -1647,6 +1728,10 @@
               if (v) {
                 e.preventDefault();
                 v.currentTime = Math.max(0, v.currentTime - 5);
+                if ((v.currentTime / (v.duration || 1)) < 0.9) {
+                  const nm = slide(currentIdx)?.dataset.name;
+                  if (nm) reportEvent("seek_back", nm);
+                }
                 showControls();
               }
               break;
@@ -1654,6 +1739,10 @@
               if (v) {
                 e.preventDefault();
                 v.currentTime = Math.min(v.duration || 0, v.currentTime + 5);
+                if ((v.currentTime / (v.duration || 1)) < 0.9) {
+                  const nm = slide(currentIdx)?.dataset.name;
+                  if (nm) reportEvent("seek_fwd", nm);
+                }
                 showControls();
               }
               break;
