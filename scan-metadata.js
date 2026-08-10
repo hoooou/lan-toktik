@@ -106,4 +106,4 @@ if (require.main === module) {
     .catch((e) => { console.error("[scan] 失败：", e.message); process.exit(1); });
 }
 
-module.exports = { MEDIA_FOLDER, DATA_DIR, checkTools, parseProbe, probeFile, extractCover, runScan };
+module.exports = { MEDIA_FOLDER, DATA_DIR, COVER_DIR, checkTools, parseProbe, probeFile, extractCover, runScan };

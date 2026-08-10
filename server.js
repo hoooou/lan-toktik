@@ -3,6 +3,10 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
+const { spawn } = require("child_process");
+const rec = require("./recommend");
+// MEDIA_FOLDER 已在本文件定义（值相同），此处只取 DATA_DIR / COVER_DIR
+const { DATA_DIR, COVER_DIR } = require("./scan-metadata");
 
 const PORT = parseInt(process.env.PORT || "8080", 10);
 const PROJECT_ROOT = __dirname;
@@ -111,6 +115,17 @@ function emitFileList(res) {
     // 目录缺失或不可读时按空列表处理
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end("[]");
+  }
+}
+
+// 读取媒体元数据缓存（缺失时返回空对象）
+function readMediaMeta() {
+  try {
+    return JSON.parse(
+      fs.readFileSync(path.join(DATA_DIR, "media-meta.json"), "utf8"),
+    );
+  } catch {
+    return {};
   }
 }
 
@@ -291,6 +306,66 @@ async function routeRequest(req, res) {
   const decoded = decodeURIComponent(req.url.split("?")[0]);
   const requestPath = decoded === "/" ? "/index.html" : decoded;
 
+  // 行为事件上报：批量更新画像
+  if (requestPath === "/api/events") {
+    if (req.method !== "POST") {
+      replyPlain(res, 404, "Not found");
+      return;
+    }
+    const raw = await readBody(req);
+    let payload;
+    try {
+      payload = JSON.parse(raw || "{}");
+    } catch {
+      replyPlain(res, 400, "Bad request");
+      return;
+    }
+    const events = Array.isArray(payload.events) ? payload.events : [];
+    // 事件校验：type 白名单 + 文件名合法性
+    const EVENT_TYPES = new Set([
+      "like", "unlike", "fav", "unfav", "delete",
+      "watch", "finish", "skip", "speedup", "seek_fwd", "seek_back",
+    ]);
+    const valid = events.filter(
+      (e) => e && EVENT_TYPES.has(e.type) && isPlainName(e.name),
+    );
+    rec.applyEvents(valid, readMediaMeta());
+    replyOk(res);
+    return;
+  }
+
+  // 推荐列表：排除回收站，返回排序 + 理由
+  if (requestPath === "/api/recommend") {
+    if (req.method !== "GET") {
+      replyPlain(res, 404, "Not found");
+      return;
+    }
+    const mediaNames = fs
+      .readdirSync(MEDIA_FOLDER)
+      .filter((n) => !n.startsWith("."));
+    const trashNames = fs
+      .readdirSync(ensureTrash())
+      .filter((n) => !n.startsWith("."));
+    const list = rec.buildRecommend({
+      mediaNames,
+      trashNames,
+      meta: readMediaMeta(),
+    });
+    replyJson(res, { list });
+    return;
+  }
+
+  // 封面图静态服务
+  if (requestPath.startsWith("/data/covers/")) {
+    const name = requestPath.slice("/data/covers/".length);
+    if (!isPlainName(name)) {
+      replyPlain(res, 404, "Not found");
+      return;
+    }
+    serveFromDir(req, res, COVER_DIR, name);
+    return;
+  }
+
   if (requestPath === "/api/delete") {
     if (req.method !== "POST") {
       replyPlain(res, 404, "Not found");
@@ -344,6 +419,16 @@ function createServer() {
 }
 
 if (require.main === module) {
+  // 启动后台元数据扫描（子进程方式，不阻塞主服务；退出码非 0 时打印醒目错误）
+  const scanProc = spawn(process.execPath, [path.join(__dirname, "scan-metadata.js")], {
+    stdio: ["ignore", "inherit", "inherit"],
+  });
+  scanProc.on("exit", (code) => {
+    if (code !== 0) {
+      console.error(`[scan] 元数据扫描失败（退出码 ${code}）：请确认已安装 ffmpeg/ffprobe`);
+    }
+  });
+
   createServer().listen(PORT, () => {
     console.log(`Server running at http://localhost:${PORT}`);
   });

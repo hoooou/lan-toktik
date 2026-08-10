@@ -18,9 +18,11 @@
 
 ## 🚀 快速开始
 
+**前置条件**：需要 `ffmpeg` / `ffprobe`（必需，用于媒体元数据扫描与封面抽帧；macOS: `brew install ffmpeg`）
+
 ```bash
 # 1. 把视频放进 media/ 目录（支持 mp4 / webm / mov 等）
-# 2. 启动服务
+# 2. 启动服务（首次启动会后台自动扫描媒体元数据与封面）
 npm start
 # 或 node server.js
 
@@ -29,6 +31,14 @@ npm start
 ```
 
 > 提示：视频也可以使用软链接放入 `media/`，无需复制大文件。
+
+## 🔌 接口
+
+| 接口 | 说明 |
+| --- | --- |
+| `POST /api/events` | 行为事件批量上报（点赞/收藏/观看等），更新推荐画像 |
+| `GET /api/recommend` | 推荐列表（按画像打分排序，含理由、副本分组、封面标记） |
+| `GET /data/covers/<name>` | 封面图静态服务 |
 
 ## 🎮 操作说明
 
