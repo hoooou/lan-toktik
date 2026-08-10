@@ -24,3 +24,6 @@ media/*
 
 # Trash
 .trash/
+
+# 运行时数据（画像/元数据/封面）
+data/
