@@ -197,6 +197,19 @@
         word-break: break-word;
         overflow-wrap: break-word;
       }
+      .video-reason {
+        margin-top: 6px;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.7);
+      }
+      .video-cover {
+        margin-top: 8px;
+        max-width: 120px;
+        max-height: 80px;
+        border-radius: 6px;
+        object-fit: cover;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
 
       /* 侧边栏 */
       .sidebar {
@@ -741,6 +754,7 @@
 
       <div class="tab-bar" id="tabBar">
         <button class="tab-btn active" data-tab="all">全部</button>
+        <button class="tab-btn" data-tab="rec">推荐</button>
         <button class="tab-btn" data-tab="fav">收藏</button>
         <button class="tab-btn" data-tab="trash">已删除</button>
       </div>
@@ -1110,7 +1124,14 @@
         // 信息面板
         const info = document.createElement("div");
         info.className = "info-panel";
-        info.innerHTML = `<div class="video-desc">${escapeHtml(item.name)}</div>`;
+        let descHtml = `<div class="video-desc">${escapeHtml(item.name)}</div>`;
+        if (item.reason) {
+          descHtml += `<div class="video-reason">${escapeHtml(item.reason)}</div>`;
+        }
+        if (item.hasCover) {
+          descHtml += `<img class="video-cover" src="data/covers/${encodeURIComponent(item.name)}" alt="" loading="lazy" onerror="this.style.display='none'">`;
+        }
+        info.innerHTML = descHtml;
         div.appendChild(info);
 
         // 侧边栏
@@ -1280,7 +1301,32 @@
 
       async function renderFeed() {
         let list;
-        if (currentTab === "fav") {
+        if (currentTab === "rec") {
+          let feed = { list: [] };
+          try {
+            feed = await (await fetch("/api/recommend")).json();
+          } catch (e) {
+            console.error(e);
+          }
+          // 竞态守卫：等待期间用户已切换 tab，丢弃本次结果
+          if (currentTab !== "rec") return;
+          list = feed.list.map((r) => {
+            const ext = r.name.split(".").pop().toLowerCase();
+            const base = {
+              name: r.name,
+              url: `${MEDIA_DIR}/${encodeURIComponent(r.name)}`,
+              reason: r.reason,
+              groupId: r.groupId,
+              groupCount: r.groupCount,
+              hasCover: r.hasCover,
+            };
+            if (V_EXT.includes(ext))
+              return { ...base, type: "video", mime: MIME[ext] || "video/mp4" };
+            if (A_EXT.includes(ext))
+              return { ...base, type: "audio", mime: MIME[ext] || "audio/mpeg" };
+            return base;
+          });
+        } else if (currentTab === "fav") {
           list = items.filter((i) => fav.has(i.name));
         } else if (currentTab === "trash") {
           let names = [];
@@ -1304,7 +1350,9 @@
         }
         feedEl.innerHTML = "";
         if (list.length === 0) {
-          if (currentTab === "fav") {
+          if (currentTab === "rec") {
+            feedEl.innerHTML = `<div style="display:flex;height:100%;align-items:center;justify-content:center;"><div class="empty"><div class="empty-icon">✨</div><h3 style="color:#fff;margin-bottom:8px;">还没有推荐</h3><p style="font-size:12px;">先到「全部」看几个视频，推荐会慢慢变懂你</p></div></div>`;
+          } else if (currentTab === "fav") {
             feedEl.innerHTML = `<div style="display:flex;height:100%;align-items:center;justify-content:center;"><div class="empty"><div class="empty-icon">⭐</div><h3 style="color:#fff;margin-bottom:8px;">还没有收藏的视频</h3></div></div>`;
           } else if (currentTab === "trash") {
             feedEl.innerHTML = `<div style="display:flex;height:100%;align-items:center;justify-content:center;"><div class="empty"><div class="empty-icon">📂</div><h3 style="color:#fff;margin-bottom:8px;">回收站是空的</h3></div></div>`;
