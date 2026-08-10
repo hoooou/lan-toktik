@@ -77,3 +77,53 @@ test("applyEvents 未知类型与非法名被忽略", () => {
   const after = rec.loadProfile();
   assert.deepStrictEqual(after.tagWeights, before.tagWeights);
 });
+
+test("scoreVideo 标签权重 + 行为分合成", () => {
+  // 用未被他例触碰的标签/文件（共享画像会被前序测试污染，"乱伦"已有累积权重）
+  rec.applyEvents([{ type: "like", name: "玉足片E.mp4" }]);
+  const p = rec.loadProfile();
+  // 玉足 +3；plays=0，无 finish，非最近看过 → 3
+  assert.strictEqual(rec.scoreVideo("玉足片E.mp4", ["玉足"], p, {}), 3);
+});
+
+test("buildRecommend 排序、理由、副本分组、回收站排除", () => {
+  rec.applyEvents([
+    { type: "like", name: "乱伦片A _ 51吃瓜网.mp4" },
+    { type: "finish", name: "乱伦片A _ 51吃瓜网.mp4" },
+  ]);
+  const list = rec.buildRecommend({
+    mediaNames: [
+      "乱伦片A _ 51吃瓜网.mp4",
+      "乱伦片A _ 51吃瓜网-20260808-xyz123.mp4",
+      "白丝片B.mp4",
+      "已删除片D.mp4",
+    ],
+    trashNames: ["已删除片D.mp4"],
+    meta: { "乱伦片A _ 51吃瓜网.mp4": { duration: 120 }, "白丝片B.mp4": { duration: 50 } },
+  });
+  // 副本只出一条
+  assert.strictEqual(list.length, 2);
+  const first = list[0];
+  assert.ok(first.name.startsWith("乱伦片A"));
+  assert.strictEqual(first.groupCount, 2);
+  assert.ok(first.reason.includes("乱伦"));
+  // 白丝片B 无行为 → 新片推荐，排第二
+  assert.ok(list[1].name.startsWith("白丝片B"));
+  assert.strictEqual(list[1].reason, "新片推荐");
+  assert.strictEqual(list[1].hasCover, false);
+  // 回收站文件不出现
+  assert.ok(!list.some((x) => x.name.includes("已删除")));
+});
+
+test("buildRecommend 冷启动（无任何行为）保持原顺序", () => {
+  const names = ["b.mp4", "a.mp4", "c.mp4"];
+  const list = rec.buildRecommend({ mediaNames: names, trashNames: [], meta: {} });
+  assert.deepStrictEqual(list.map((x) => x.name), names);
+  assert.ok(list.every((x) => x.reason === "新片推荐"));
+});
+
+test("tierTags 时长与清晰度档位", () => {
+  assert.deepStrictEqual(rec.tierTags("x.mp4", { "x.mp4": { duration: 30, width: 1280, height: 720 } }), ["短片", "高清"]);
+  assert.deepStrictEqual(rec.tierTags("x.mp4", { "x.mp4": { duration: 3600, width: 3840, height: 2160 } }), ["长片", "4K"]);
+  assert.deepStrictEqual(rec.tierTags("x.mp4", {}), []);
+});

@@ -129,4 +129,90 @@ function applyEvents(events, meta = {}) {
   saveProfile(profile);
 }
 
-module.exports = { DATA_DIR, TAG_LEXICON, extractTags, groupKey, loadProfile, saveProfile, applyEvents };
+// 时长档位标签（与题材词并列参与权重）
+function durationTag(seconds) {
+  if (seconds < 60) return "短片";
+  if (seconds < 300) return "中片";
+  return "长片";
+}
+
+// 清晰度档位标签（按分辨率高度）
+function resTag(height) {
+  if (height >= 2160) return "4K";
+  if (height >= 1440) return "2K";
+  if (height >= 1080) return "超清";
+  if (height >= 720) return "高清";
+  return "标清";
+}
+
+// 单个视频的全部标签：题材词 + 时长档 + 清晰度档
+function tierTags(name, meta = {}) {
+  const m = meta[name];
+  if (!m || !m.duration) return [];
+  const tags = [durationTag(m.duration)];
+  if (m.height) tags.push(resTag(m.height));
+  return tags;
+}
+
+// 视频得分 = 各标签权重之和 + 行为分
+// 行为分 = 播放次数×0.3 + 完成(≥1次 finish)×1.5 + 最近看过(24h内) -1
+function scoreVideo(name, tags, profile, meta = {}) {
+  let score = 0;
+  for (const tag of tags) score += profile.tagWeights[tag] || 0;
+  const st = profile.videoStats[name];
+  if (st) {
+    score += st.plays * 0.3;
+    if (st.finishes > 0) score += 1.5;
+    if (Date.now() - st.lastWatch < 24 * 3600 * 1000) score -= 1;
+  }
+  return score;
+}
+
+// 推荐理由：按权重最高的正标签；无标签时按行为分；再按新片
+function reasonFor(name, tags, profile) {
+  let bestTag = null;
+  let bestWeight = 0;
+  for (const tag of tags) {
+    const w = profile.tagWeights[tag] || 0;
+    if (w > bestWeight) { bestWeight = w; bestTag = tag; }
+  }
+  if (bestTag) return `因为你看过「${bestTag}」类`;
+  const st = profile.videoStats[name];
+  if (st && st.plays >= 3) return "你看过多次";
+  if (st && st.plays > 0) return "热门视频";
+  return "新片推荐";
+}
+
+// 构建推荐列表：排除回收站 → 打分 → 副本分组(取组内最高分) → 按分降序
+// 冷启动（全部分数相同）时保持 mediaNames 原顺序（稳定排序）
+function buildRecommend({ mediaNames, trashNames = [], meta = {} }) {
+  const profile = loadProfile();
+  const trashSet = new Set(trashNames);
+  const byGroup = new Map(); // groupKey -> { name, score, tags, idx }
+  mediaNames.forEach((name, idx) => {
+    if (trashSet.has(name)) return;
+    const tags = [...extractTags(name), ...tierTags(name, meta)];
+    const score = scoreVideo(name, tags, profile, meta);
+    const key = groupKey(name);
+    const prev = byGroup.get(key);
+    if (!prev || score > prev.score) byGroup.set(key, { name, score, tags, idx });
+  });
+  // 组内成员数（同组去重统计）
+  const groupCounts = new Map();
+  mediaNames.forEach((name) => {
+    if (trashSet.has(name)) return;
+    const key = groupKey(name);
+    groupCounts.set(key, (groupCounts.get(key) || 0) + 1);
+  });
+  const list = [...byGroup.values()].sort((a, b) => b.score - a.score || a.idx - b.idx);
+  return list.map((g) => ({
+    name: g.name,
+    reason: reasonFor(g.name, g.tags, profile),
+    groupId: groupKey(g.name),
+    groupCount: groupCounts.get(groupKey(g.name)) || 1,
+    hasCover: !!(meta[g.name] && meta[g.name].cover),
+  }));
+}
+
+// 更新导出
+module.exports = { DATA_DIR, TAG_LEXICON, extractTags, groupKey, loadProfile, saveProfile, applyEvents, durationTag, resTag, tierTags, scoreVideo, reasonFor, buildRecommend };
