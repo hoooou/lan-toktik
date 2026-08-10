@@ -26,7 +26,7 @@
 **Files:**
 - Create: `recommend.js`
 - Create: `test/recommend.test.js`
-- Modify: `package.json`（加 `"test": "node --test test/"`，engines 改 `">=18"`）
+- Modify: `package.json`（加 `"test": "node --test"`，engines 改 `">=18"`）
 - Modify: `.gitignore`（追加 `data/`）
 
 **Interfaces:**
@@ -127,7 +127,7 @@ test("applyEvents 未知类型与非法名被忽略", () => {
 
 - [ ] **Step 2: 运行测试确认失败**
 
-Run: `node --test test/`
+Run: `node --test`（零参自动发现 test/；本机 Node v26 下 `node --test test/` 会把目录当模块路径报错，全量运行统一用零参或 `npm test`）
 Expected: FAIL — `Cannot find module '../recommend.js'`
 
 - [ ] **Step 3: 实现 recommend.js（核心部分）**
@@ -279,7 +279,7 @@ data/
 
 - [ ] **Step 5: 运行测试确认通过**
 
-Run: `node --test test/`
+Run: `node --test`（零参自动发现 test/；本机 Node v26 下 `node --test test/` 会把目录当模块路径报错，全量运行统一用零参或 `npm test`）
 Expected: 全部 PASS
 
 - [ ] **Step 6: 提交**
@@ -358,7 +358,7 @@ test("tierTags 时长与清晰度档位", () => {
 
 - [ ] **Step 2: 运行测试确认失败**
 
-Run: `node --test test/`
+Run: `node --test`（零参自动发现 test/；本机 Node v26 下 `node --test test/` 会把目录当模块路径报错，全量运行统一用零参或 `npm test`）
 Expected: FAIL — `rec.scoreVideo is not a function` / `rec.tierTags is not a function` / `rec.buildRecommend is not a function`
 
 - [ ] **Step 3: 实现排序与理由**（`recommend.js` 追加）
@@ -455,7 +455,7 @@ module.exports = { DATA_DIR, TAG_LEXICON, extractTags, groupKey, loadProfile, sa
 
 - [ ] **Step 4: 运行测试确认通过**
 
-Run: `node --test test/`
+Run: `node --test`（零参自动发现 test/；本机 Node v26 下 `node --test test/` 会把目录当模块路径报错，全量运行统一用零参或 `npm test`）
 Expected: 全部 PASS
 
 - [ ] **Step 5: 提交**
@@ -484,37 +484,7 @@ git commit -m "feat: 推荐排序、推荐理由与副本分组"
 
 - [ ] **Step 1: 写失败测试**
 
-`test/scan-metadata.test.js`:
-
-```js
-const test = require("node:test");
-const assert = require("node:assert");
-const path = require("node:path");
-const fs = require("node:fs");
-const os = require("node:os");
-
-process.env.RECOMMEND_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "scan-"));
-const scan = require("../scan-metadata.js");
-
-test("durationTag 分档", () => {
-  assert.strictEqual(scan.durationTag(30), "短片");
-  assert.strictEqual(scan.durationTag(120), "中片");
-  assert.strictEqual(scan.durationTag(600), "长片");
-});
-
-test("resTag 按高度分档", () => {
-  assert.strictEqual(scan.resTag(480), "标清");
-  assert.strictEqual(scan.resTag(720), "高清");
-  assert.strictEqual(scan.resTag(1080), "超清");
-  assert.strictEqual(scan.resTag(2160), "4K");
-});
-
-test("checkTools 存在时返回 true（本机已装 ffmpeg）", () => {
-  assert.strictEqual(scan.checkTools(), true);
-});
-```
-
-（注：`durationTag/resTag` 的实现放 scan-metadata.js 还是 recommend.js？——设计定稿里时长/清晰度档位在 recommend.js 的 `tierTags` 已实现（Task 2 的 durationTag/resTag）。为避免重复，Task 3 的测试只覆盖 `checkTools` 与 ffprobe 解析，档位逻辑沿用 recommend.js 的导出，`scan-metadata.js` 不再重复实现。因此上面的测试文件改为：）
+`test/scan-metadata.test.js`（档位函数 durationTag/resTag 已在 Task 2 的 recommend.js 实现，此处只测扫描自身逻辑）:
 
 ```js
 const test = require("node:test");
@@ -876,7 +846,7 @@ scanProc.on("exit", (code) => {
 
 - [ ] **Step 4: 运行测试确认通过**
 
-Run: `node --test test/`
+Run: `node --test`（零参自动发现 test/；本机 Node v26 下 `node --test test/` 会把目录当模块路径报错，全量运行统一用零参或 `npm test`）
 Expected: 全部 PASS（含 server-api）
 
 - [ ] **Step 5: 手工 curl 验证**
@@ -1182,7 +1152,7 @@ git commit -m "feat: 客户端行为埋点（批量上报观看/完成/划走/�
 
 - [ ] **Step 1: 全量测试**
 
-Run: `node --test test/`
+Run: `node --test`（零参自动发现 test/；本机 Node v26 下 `node --test test/` 会把目录当模块路径报错，全量运行统一用零参或 `npm test`）
 Expected: 全部 PASS
 
 - [ ] **Step 2: 服务端全流程 curl 验证**
